@@ -28,7 +28,7 @@ pub struct Drift {
 
 fn directory(root: &Path, name: &str) -> Result<PathBuf> {
     util::safe_name(name)?;
-    Ok(root.join(".contracts/proposals").join(name))
+    Ok(root.join(".docket/proposals").join(name))
 }
 
 pub fn create(root: &Path, name: &str) -> Result<()> {
@@ -39,7 +39,7 @@ pub fn create(root: &Path, name: &str) -> Result<()> {
         !documents.is_empty(),
         "sync contracts before creating a proposal"
     );
-    let staging = tempfile::tempdir_in(root.join(".contracts/local"))?;
+    let staging = tempfile::tempdir_in(root.join(".docket/local"))?;
     let proposal = Proposal {
         format_version: 1,
         name: name.into(),
@@ -66,7 +66,7 @@ pub fn create(root: &Path, name: &str) -> Result<()> {
 }
 
 pub fn list(root: &Path) -> Result<Vec<Proposal>> {
-    let path = root.join(".contracts/proposals");
+    let path = root.join(".docket/proposals");
     if !path.exists() {
         return Ok(Vec::new());
     }
@@ -179,7 +179,7 @@ pub fn edit(
     let temporary = tempfile::Builder::new()
         .prefix("proposal-edit-")
         .suffix(".json")
-        .tempfile_in(root.join(".contracts/local"))?;
+        .tempfile_in(root.join(".docket/local"))?;
     util::write_json(temporary.path(), value)?;
     let editor = std::env::var("VISUAL")
         .or_else(|_| std::env::var("EDITOR"))

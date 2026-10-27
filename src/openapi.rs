@@ -162,7 +162,7 @@ pub fn bundle(root: &Path, source: &Path, document: Value) -> Result<Value> {
             } else {
                 let relative = target_path.strip_prefix(&root)?;
                 format!(
-                    "/x-contracts-bundled/{}",
+                    "/x-docket-bundled/{}",
                     &util::hash(relative.to_string_lossy().as_bytes())[..24]
                 )
             };
@@ -179,16 +179,16 @@ pub fn bundle(root: &Path, source: &Path, document: Value) -> Result<Value> {
         let bundled = result
             .as_object_mut()
             .context("OpenAPI must be an object")?
-            .entry("x-contracts-bundled")
+            .entry("x-docket-bundled")
             .or_insert_with(|| json!({}))
             .as_object_mut()
-            .context("x-contracts-bundled must be an object")?;
+            .context("x-docket-bundled must be an object")?;
         for (path, value) in transformed {
             let key =
                 util::hash(path.strip_prefix(&root)?.to_string_lossy().as_bytes())[..24].to_owned();
             ensure!(
                 !bundled.contains_key(&key),
-                "reserved x-contracts-bundled key collision"
+                "reserved x-docket-bundled key collision"
             );
             bundled.insert(key, value);
         }

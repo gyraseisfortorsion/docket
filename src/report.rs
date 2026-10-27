@@ -127,7 +127,7 @@ pub fn render(report: &Report, format: Format) -> Result<String> {
 
 fn markdown(report: &Report) -> Result<String> {
     let mut out = format!(
-        "# API contract report\n\nBaseline: {} (`{}`)\n\nCurrent snapshot: `{}`\n\nTool: contracts {}; compatibility engine: {}\n\n{} breaking findings; {} total compatibility findings; {} structural/documentation changes.\n\n{}\n",
+        "# Docket contract report\n\nBaseline: {} (`{}`)\n\nCurrent snapshot: `{}`\n\nTool: docket {}; compatibility engine: {}\n\n{} breaking findings; {} total compatibility findings; {} structural/documentation changes.\n\n{}\n",
         md(&report.baseline),
         report.baseline_snapshot,
         report.current_snapshot,
@@ -189,7 +189,7 @@ fn markdown(report: &Report) -> Result<String> {
 
 fn text(report: &Report) -> Result<String> {
     let mut out = format!(
-        "API CONTRACT REPORT\nBaseline: {} ({})\nCurrent: {}\nTool: contracts {}\nCompatibility engine: {}\nBreaking: {}; findings: {}; changes: {}\n{}\n\nCOMPATIBILITY FINDINGS\n",
+        "DOCKET CONTRACT REPORT\nBaseline: {} ({})\nCurrent: {}\nTool: docket {}\nCompatibility engine: {}\nBreaking: {}; findings: {}; changes: {}\n{}\n\nCOMPATIBILITY FINDINGS\n",
         report.baseline,
         report.baseline_snapshot,
         report.current_snapshot,
@@ -221,7 +221,7 @@ fn text(report: &Report) -> Result<String> {
 
 fn html_report(report: &Report) -> Result<String> {
     let mut out = format!(
-        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>API contract report</title><style>body{{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 24px;color:#172033;background:#f8fafc}}h1,h2{{letter-spacing:-.03em}}section,details{{background:white;border:1px solid #dbe2ea;border-radius:10px;padding:16px;margin:12px 0}}summary{{cursor:pointer;font-weight:600}}pre{{overflow:auto;background:#f1f5f9;padding:16px;border-radius:6px;font-size:13px}}.breaking{{color:#b42318}}code{{overflow-wrap:anywhere}}</style></head><body><h1>API contract report</h1><p>Baseline: {} · <code>{}</code></p><p>Current: <code>{}</code></p><p>contracts {} · {}</p><p class=\"breaking\">{} breaking findings</p><p>{}</p>",
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Docket contract report</title><style>body{{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 24px;color:#172033;background:#f8fafc}}h1,h2{{letter-spacing:-.03em}}section,details{{background:white;border:1px solid #dbe2ea;border-radius:10px;padding:16px;margin:12px 0}}summary{{cursor:pointer;font-weight:600}}pre{{overflow:auto;background:#f1f5f9;padding:16px;border-radius:6px;font-size:13px}}.breaking{{color:#b42318}}code{{overflow-wrap:anywhere}}</style></head><body><h1>Docket contract report</h1><p>Baseline: {} · <code>{}</code></p><p>Current: <code>{}</code></p><p>docket {} · {}</p><p class=\"breaking\">{} breaking findings</p><p>{}</p>",
         html(&report.baseline),
         html(&report.baseline_snapshot),
         html(&report.current_snapshot),

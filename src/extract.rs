@@ -46,16 +46,16 @@ pub fn extract(
                 let directory = source_cwd(root, cwd.as_deref())?;
                 let mut process = Command::new(&command[0]);
                 process.args(&command[1..]).current_dir(&directory);
-                process.env("CONTRACTS_SOURCE_ROOT", root);
+                process.env("DOCKET_SOURCE_ROOT", root);
                 if let Some(original) = original_root {
-                    process.env("CONTRACTS_ORIGINAL_ROOT", original);
+                    process.env("DOCKET_ORIGINAL_ROOT", original);
                 }
                 let bytes = util::run_checked(&mut process, timeout)
                     .with_context(|| format!("export {name}"))?;
                 (
                     serde_json::from_slice(&bytes)
                         .with_context(|| format!("{name}: export command must print JSON only"))?,
-                    directory.join("__contracts_export__.json"),
+                    directory.join("__docket_export__.json"),
                 )
             }
             Source::Fastapi {
@@ -97,7 +97,7 @@ pub fn extract(
                         .get("document")
                         .context("adapter omitted document")?
                         .clone(),
-                    directory.join("__contracts_fastapi__.json"),
+                    directory.join("__docket_fastapi__.json"),
                 )
             }
         };

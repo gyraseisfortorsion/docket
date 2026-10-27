@@ -10,14 +10,14 @@ import time
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", default="target/release/contracts")
+    parser.add_argument("--binary", default="target/release/docket")
     parser.add_argument("--sizes", nargs="+", type=int, default=[100, 1000, 10000])
     parser.add_argument("--fastapi-python", help="Also benchmark fresh FastAPI imports/schema generation with this interpreter")
     args = parser.parse_args()
     binary = str(pathlib.Path(args.binary).resolve())
     results = []
     for size in args.sizes:
-        with tempfile.TemporaryDirectory(prefix="contracts-benchmark-") as directory:
+        with tempfile.TemporaryDirectory(prefix="docket-benchmark-") as directory:
             root = pathlib.Path(directory)
 
             def run(*argv):
@@ -57,7 +57,7 @@ def main():
         if args.fastapi_python:
             # Preserve the venv executable path: resolving its symlink loses sys.prefix.
             interpreter = str(pathlib.Path(args.fastapi_python).absolute())
-            with tempfile.TemporaryDirectory(prefix="contracts-fastapi-benchmark-") as directory:
+            with tempfile.TemporaryDirectory(prefix="docket-fastapi-benchmark-") as directory:
                 root = pathlib.Path(directory)
 
                 def run(*argv):

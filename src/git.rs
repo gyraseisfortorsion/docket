@@ -17,7 +17,7 @@ use std::{
 };
 
 const TIMEOUT: Duration = Duration::from_secs(120);
-const MARKER: &str = "# contracts-managed-hook v1";
+const MARKER: &str = "# docket-managed-hook v1";
 
 fn command(root: &Path) -> Command {
     let mut command = Command::new("git");
@@ -65,7 +65,7 @@ pub fn baseline(root: &Path, reference: &str) -> Result<Documents> {
     )?;
     let repo = repo_root(root)?;
     let prefix = prefix(root, &repo)?;
-    let manifest_path = format!("{commit}:{prefix}.contracts/head/manifest.json");
+    let manifest_path = format!("{commit}:{prefix}.docket/head/manifest.json");
     let result = util::run(command(root).args(["show", &manifest_path]), TIMEOUT)?;
     if !result.success {
         return Ok(Documents::new());
@@ -80,7 +80,7 @@ pub fn baseline(root: &Path, reference: &str) -> Result<Documents> {
             root,
             &[
                 "show",
-                &format!("{commit}:{prefix}.contracts/head/{service}/openapi.json"),
+                &format!("{commit}:{prefix}.docket/head/{service}/openapi.json"),
             ],
         )?)?;
         ensure!(
@@ -110,7 +110,7 @@ pub fn install(root: &Path) -> Result<PathBuf> {
     let directory = hooks_directory(root)?;
     fs::create_dir_all(&directory)?;
     let hook = directory.join("pre-commit");
-    let backup = directory.join("pre-commit.contracts-original");
+    let backup = directory.join("pre-commit.docket-original");
     if hook.exists() {
         let content = fs::read_to_string(&hook).unwrap_or_default();
         if !content.contains(MARKER) {
@@ -145,10 +145,10 @@ pub fn uninstall(root: &Path) -> Result<()> {
     }
     ensure!(
         fs::read_to_string(&hook)?.contains(MARKER),
-        "pre-commit is not managed by contracts"
+        "pre-commit is not managed by Docket"
     );
     fs::remove_file(&hook)?;
-    let backup = directory.join("pre-commit.contracts-original");
+    let backup = directory.join("pre-commit.docket-original");
     if backup.exists() {
         fs::rename(backup, hook)?;
     }
@@ -158,7 +158,7 @@ pub fn uninstall(root: &Path) -> Result<()> {
 fn relevant(config: &Config, paths: &[String], prefix: &str) -> Result<bool> {
     if paths
         .iter()
-        .any(|p| p == &format!("{prefix}.contracts/config.toml"))
+        .any(|p| p == &format!("{prefix}.docket/config.toml"))
     {
         return Ok(true);
     }
@@ -169,7 +169,7 @@ fn relevant(config: &Config, paths: &[String], prefix: &str) -> Result<bool> {
         }
         let matcher = builder.build()?;
         for path in paths {
-            if path.starts_with(&format!("{prefix}.contracts/")) {
+            if path.starts_with(&format!("{prefix}.docket/")) {
                 continue;
             }
             let relative = path.strip_prefix(prefix).unwrap_or(path);
@@ -187,14 +187,14 @@ pub fn hook(root: &Path) -> Result<()> {
     let repo = repo_root(root)?;
     let prefix = prefix(root, &repo)?;
     let staged = names(&output(root, &["diff", "--cached", "--name-only", "-z"])?)?;
-    let indexed_config = output(root, &["show", &format!(":{prefix}.contracts/config.toml")])
-        .context("stage .contracts/config.toml before committing")?;
+    let indexed_config = output(root, &["show", &format!(":{prefix}.docket/config.toml")])
+        .context("stage .docket/config.toml before committing")?;
     let config: Config = toml::from_str(std::str::from_utf8(&indexed_config)?)?;
     let needs_extract = relevant(&config, &staged, &prefix)?;
     let generated_changed = staged.iter().any(|p| {
         ["head/", "objects/", "history/"]
             .iter()
-            .any(|part| p.starts_with(&format!("{prefix}.contracts/{part}")))
+            .any(|part| p.starts_with(&format!("{prefix}.docket/{part}")))
     });
     if !needs_extract && !generated_changed {
         return Ok(());
@@ -264,7 +264,7 @@ pub fn hook(root: &Path) -> Result<()> {
     let git_dir = string(&repo, &["rev-parse", "--absolute-git-dir"])?;
     let artifact_paths: Vec<String> = ["head", "history", "objects"]
         .iter()
-        .map(|part| format!("{prefix}.contracts/{part}"))
+        .map(|part| format!("{prefix}.docket/{part}"))
         .filter(|p| export.join(p).exists())
         .collect();
     let mut add = Command::new("git");
@@ -302,7 +302,7 @@ pub fn hook(root: &Path) -> Result<()> {
             &old_tree,
             &new_tree,
             "--",
-            &format!("{prefix}.contracts"),
+            &format!("{prefix}.docket"),
         ],
     )?)?;
     if !changed.is_empty() {
@@ -315,14 +315,11 @@ pub fn hook(root: &Path) -> Result<()> {
             &candidate,
             &changed,
         )?;
-        eprintln!(
-            "contracts: updated staged contracts ({} files)",
-            changed.len()
-        );
+        eprintln!("docket: updated staged contracts ({} files)", changed.len());
     }
     if comparison.breaking() > 0 {
         eprintln!(
-            "contracts: WARNING: {} breaking API change(s); commit is allowed",
+            "docket: WARNING: {} breaking API change(s); commit is allowed",
             comparison.breaking()
         );
         for finding in comparison
@@ -363,11 +360,9 @@ fn publish(
     candidate: &Path,
     changed: &[String],
 ) -> Result<()> {
-    let prepared = tempfile::tempdir_in(root.join(".contracts/local"))?;
+    let prepared = tempfile::tempdir_in(root.join(".docket/local"))?;
     let prepared_head = prepared.path().join("head");
-    let staged_head = export
-        .join(root.strip_prefix(repo)?)
-        .join(".contracts/head");
+    let staged_head = export.join(root.strip_prefix(repo)?).join(".docket/head");
     fs::create_dir_all(&prepared_head)?;
     for path in util::files(&staged_head)? {
         util::write_prepared(
@@ -387,8 +382,8 @@ fn publish(
         fs::read(index)? == original_index,
         "Git index changed during extraction; retry the commit"
     );
-    let head = root.join(".contracts/head");
-    let saved_head = root.join(".contracts/local/hook-head-backup");
+    let head = root.join(".docket/head");
+    let saved_head = root.join(".docket/local/hook-head-backup");
     ensure!(
         !saved_head.exists(),
         "unfinished hook backup at {}; restore it before retrying",
@@ -401,7 +396,7 @@ fn publish(
     let mut backups = Vec::new();
     let result = (|| -> Result<()> {
         fs::rename(&prepared_head, &head)?;
-        let head_prefix = format!("{}.contracts/head/", prefix(root, repo)?);
+        let head_prefix = format!("{}.docket/head/", prefix(root, repo)?);
         for path in changed {
             if path.starts_with(&head_prefix) {
                 continue;

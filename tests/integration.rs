@@ -1,7 +1,7 @@
 //! Opt-in real-engine/Python integration suite. Run with --include-ignored after
-//! `contracts engine install` and setting CONTRACTS_TEST_PYTHON to a FastAPI environment.
+//! `docket engine install` and setting DOCKET_TEST_PYTHON to a FastAPI environment.
 use assert_cmd::Command;
-use contracts::{compare, engine, report, store, util};
+use docket::{compare, engine, report, store, util};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -13,7 +13,7 @@ use std::{
 use tempfile::TempDir;
 
 fn cli(root: &Path) -> Command {
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("contracts"));
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("docket"));
     command.current_dir(root);
     command
 }
@@ -21,9 +21,9 @@ fn example() -> Value {
     serde_json::from_str(include_str!("../examples/users.openapi.json")).unwrap()
 }
 fn python() -> PathBuf {
-    std::env::var_os("CONTRACTS_TEST_PYTHON")
+    std::env::var_os("DOCKET_TEST_PYTHON")
         .map(PathBuf::from)
-        .expect("set CONTRACTS_TEST_PYTHON to an interpreter with FastAPI installed")
+        .expect("set DOCKET_TEST_PYTHON to an interpreter with FastAPI installed")
 }
 fn project() -> TempDir {
     project_with_history("full")
@@ -62,8 +62,8 @@ fn git(root: &Path, args: &[&str]) -> Vec<u8> {
 }
 fn git_init(root: &Path) {
     git(root, &["init", "-q"]);
-    git(root, &["config", "user.name", "Contracts Tests"]);
-    git(root, &["config", "user.email", "contracts@example.invalid"]);
+    git(root, &["config", "user.name", "Docket Tests"]);
+    git(root, &["config", "user.email", "docket@example.invalid"]);
     git(root, &["config", "commit.gpgsign", "false"]);
 }
 fn initial_commit(root: &Path) {
@@ -207,7 +207,7 @@ fn git_hook_records_staged_spec_and_preserves_unstaged_source() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("WARNING"));
     let committed: Value = serde_json::from_slice(&git(
         root,
-        &["show", "HEAD:.contracts/head/users-api/openapi.json"],
+        &["show", "HEAD:.docket/head/users-api/openapi.json"],
     ))
     .unwrap();
     assert_eq!(committed, staged);
@@ -228,7 +228,7 @@ fn git_hook_records_staged_spec_and_preserves_unstaged_source() {
 fn git_head_only_baselines_and_ci_reject_stale_snapshots() {
     let project = project_with_history("head");
     let root = project.path();
-    assert!(!root.join(".contracts/history").exists());
+    assert!(!root.join(".docket/history").exists());
     initial_commit(root);
     cli(root)
         .args(["check", "--against", "git:HEAD"])
@@ -313,7 +313,7 @@ fn fastapi_partial_commit_prefers_staged_src_over_editable_source() {
     );
     let doc: Value = serde_json::from_slice(&git(
         root,
-        &["show", "HEAD:.contracts/head/users-api/openapi.json"],
+        &["show", "HEAD:.docket/head/users-api/openapi.json"],
     ))
     .unwrap();
     let required = &doc["components"]["schemas"]["Body"]["required"];
@@ -370,7 +370,7 @@ fn fastapi_rejects_editable_modules_outside_the_staged_export() {
     )
     .unwrap();
     git(root, &["add", "src/users/application.py"]);
-    let before = fs::read(root.join(".contracts/head/manifest.json")).unwrap();
+    let before = fs::read(root.join(".docket/head/manifest.json")).unwrap();
     let index = fs::read(root.join(".git/index")).unwrap();
     let output = Process::new("git")
         .current_dir(root)
@@ -386,7 +386,7 @@ fn fastapi_rejects_editable_modules_outside_the_staged_export() {
     );
     assert_eq!(
         before,
-        fs::read(root.join(".contracts/head/manifest.json")).unwrap()
+        fs::read(root.join(".docket/head/manifest.json")).unwrap()
     );
     // Git itself may refresh stat/cache extensions, so compare staged tree identity.
     assert!(!index.is_empty());
@@ -433,7 +433,7 @@ fn export_commands_and_targeted_proposal_edits_are_validated() {
         .env_remove("VISUAL")
         .assert()
         .success();
-    let path = root.join(".contracts/proposals/edit-schema/users-api/openapi.json");
+    let path = root.join(".docket/proposals/edit-schema/users-api/openapi.json");
     assert_eq!(
         util::read_json::<Value>(&path).unwrap()["components"]["schemas"]["UserCreate"]["properties"]
             ["preference"]["type"],
@@ -458,11 +458,11 @@ fn export_commands_and_targeted_proposal_edits_are_validated() {
         b"raise RuntimeError('export failed')\n",
     )
     .unwrap();
-    let head = fs::read(root.join(".contracts/head/manifest.json")).unwrap();
+    let head = fs::read(root.join(".docket/head/manifest.json")).unwrap();
     cli(root).arg("sync").assert().failure();
     assert_eq!(
         head,
-        fs::read(root.join(".contracts/head/manifest.json")).unwrap()
+        fs::read(root.join(".docket/head/manifest.json")).unwrap()
     );
 }
 

@@ -10,13 +10,13 @@ import tempfile
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", default="target/release/contracts")
+    parser.add_argument("--binary", default="target/release/docket")
     parser.add_argument("--output", default="target/demo-report.html")
     args = parser.parse_args()
     binary = str(pathlib.Path(args.binary).resolve())
     output = pathlib.Path(args.output).absolute()
     example = pathlib.Path(__file__).resolve().parents[1] / "examples/users.openapi.json"
-    with tempfile.TemporaryDirectory(prefix="contracts-demo-") as directory:
+    with tempfile.TemporaryDirectory(prefix="docket-demo-") as directory:
         root = pathlib.Path(directory)
 
         def run(*argv):
@@ -33,7 +33,7 @@ def main():
         model["required"].append("email")
         desired = copy.deepcopy(changed)
         desired["components"]["schemas"]["UserCreate"]["properties"]["timezone"] = {"type": "string"}
-        proposal = root / ".contracts/proposals/user-contact-details/users-api/openapi.json"
+        proposal = root / ".docket/proposals/user-contact-details/users-api/openapi.json"
         proposal.write_text(json.dumps(desired))
         (root / "openapi.json").write_text(json.dumps(changed))
         run("sync")

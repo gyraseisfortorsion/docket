@@ -41,7 +41,7 @@ impl Drop for Lock {
 }
 
 pub fn lock(root: &Path) -> Result<Lock> {
-    let directory = root.join(".contracts/local");
+    let directory = root.join(".docket/local");
     fs::create_dir_all(&directory)?;
     let file = OpenOptions::new()
         .create(true)
@@ -50,14 +50,14 @@ pub fn lock(root: &Path) -> Result<Lock> {
         .write(true)
         .open(directory.join("lock"))?;
     file.try_lock_exclusive()
-        .context("another contracts operation is running")?;
+        .context("another docket operation is running")?;
     recover(root)?;
     Ok(Lock(file))
 }
 
 fn recover(root: &Path) -> Result<()> {
-    let backup = root.join(".contracts/local/head-backup");
-    let head = root.join(".contracts/head");
+    let backup = root.join(".docket/local/head-backup");
+    let head = root.join(".docket/head");
     if backup.exists() {
         if !head.exists() {
             fs::rename(&backup, &head)?;
@@ -69,10 +69,10 @@ fn recover(root: &Path) -> Result<()> {
 }
 
 pub fn manifest(root: &Path) -> Result<Option<Manifest>> {
-    let path = root.join(".contracts/head/manifest.json");
+    let path = root.join(".docket/head/manifest.json");
     if !path.exists() {
         ensure!(
-            util::files(&root.join(".contracts/head"))?.is_empty(),
+            util::files(&root.join(".docket/head"))?.is_empty(),
             "head is missing its manifest; restore it from Git or history"
         );
         return Ok(None);
@@ -86,7 +86,7 @@ pub fn verify(root: &Path) -> Result<()> {
     let Some(manifest) = manifest(root)? else {
         return Ok(());
     };
-    let head = root.join(".contracts/head");
+    let head = root.join(".docket/head");
     let mut actual = BTreeSet::new();
     for path in util::files(&head)? {
         let name = path.to_string_lossy().replace('\\', "/");
@@ -119,7 +119,7 @@ pub fn head(root: &Path) -> Result<Documents> {
     for (name, digest) in &manifest.services {
         util::safe_name(name)?;
         let doc: serde_json::Value =
-            util::read_json(&root.join(".contracts/head").join(name).join("openapi.json"))?;
+            util::read_json(&root.join(".docket/head").join(name).join("openapi.json"))?;
         ensure!(
             util::hash(&util::json_bytes(&doc)?) == *digest,
             "snapshot hash mismatch for {name}"
@@ -216,7 +216,7 @@ pub fn sync(root: &Path, config: &Config, documents: &Documents) -> Result<SyncR
             .collect(),
     };
     files.insert(PathBuf::from("manifest.json"), util::json_bytes(&manifest)?);
-    let staging = tempfile::tempdir_in(root.join(".contracts/local"))?;
+    let staging = tempfile::tempdir_in(root.join(".docket/local"))?;
     let new_head = staging.path().join("head");
     fs::create_dir_all(&new_head)?;
     for (path, bytes) in files {
@@ -226,7 +226,7 @@ pub fn sync(root: &Path, config: &Config, documents: &Documents) -> Result<SyncR
         for (name, doc) in documents {
             let digest = &revision.services[name];
             let path = root
-                .join(".contracts/objects")
+                .join(".docket/objects")
                 .join(format!("{digest}.json.zst"));
             if !path.exists() {
                 let bytes = zstd::stream::encode_all(util::json_bytes(doc)?.as_slice(), 3)?;
@@ -241,13 +241,13 @@ pub fn sync(root: &Path, config: &Config, documents: &Documents) -> Result<SyncR
         }
         util::write_json(
             &root
-                .join(".contracts/history")
+                .join(".docket/history")
                 .join(format!("{}.json", revision.id)),
             revision,
         )?;
     }
-    let current_head = root.join(".contracts/head");
-    let backup = root.join(".contracts/local/head-backup");
+    let current_head = root.join(".docket/head");
+    let backup = root.join(".docket/local/head-backup");
     let existed = current_head.exists();
     if existed {
         fs::rename(&current_head, &backup)?;
@@ -270,10 +270,10 @@ pub fn sync(root: &Path, config: &Config, documents: &Documents) -> Result<SyncR
 }
 
 pub fn revisions(root: &Path) -> Result<Vec<Revision>> {
-    let mut records: Vec<Revision> = util::files(&root.join(".contracts/history"))?
+    let mut records: Vec<Revision> = util::files(&root.join(".docket/history"))?
         .into_iter()
         .filter(|path| path.extension().is_some_and(|e| e == "json"))
-        .map(|path| util::read_json(&root.join(".contracts/history").join(path)))
+        .map(|path| util::read_json(&root.join(".docket/history").join(path)))
         .collect::<Result<_>>()?;
     records.sort_by(|a, b| b.created_at.cmp(&a.created_at).then(b.id.cmp(&a.id)));
     Ok(records)
@@ -305,7 +305,7 @@ pub fn load_revision(root: &Path, prefix: &str) -> Result<Documents> {
         );
         let bytes = zstd::stream::decode_all(
             fs::read(
-                root.join(".contracts/objects")
+                root.join(".docket/objects")
                     .join(format!("{digest}.json.zst")),
             )?
             .as_slice(),
@@ -345,8 +345,8 @@ pub fn baseline(root: &Path, selector: &str) -> Result<Documents> {
 }
 
 pub fn ensure_initialized(root: &Path) -> Result<()> {
-    if !root.join(".contracts/config.toml").exists() {
-        bail!("run contracts init first");
+    if !root.join(".docket/config.toml").exists() {
+        bail!("run docket init first");
     }
     Ok(())
 }

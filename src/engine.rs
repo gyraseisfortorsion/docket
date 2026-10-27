@@ -17,7 +17,7 @@ pub fn cache_path() -> Result<PathBuf> {
         .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".cache")))
         .context("set XDG_CACHE_HOME or HOME to install oasdiff")?;
     Ok(base
-        .join("contracts")
+        .join("docket")
         .join(format!("oasdiff-{VERSION}"))
         .join(if cfg!(windows) {
             "oasdiff.exe"
@@ -32,14 +32,14 @@ pub fn verify(path: &Path) -> Result<()> {
     ensure!(
         text.split_whitespace()
             .any(|word| word.trim_start_matches('v') == VERSION),
-        "expected oasdiff {VERSION}, got {}; run contracts engine install",
+        "expected oasdiff {VERSION}, got {}; run docket engine install",
         text.trim()
     );
     Ok(())
 }
 
 pub fn locate() -> Result<PathBuf> {
-    if let Some(path) = std::env::var_os("CONTRACTS_OASDIFF") {
+    if let Some(path) = std::env::var_os("DOCKET_OASDIFF") {
         let path = PathBuf::from(path);
         verify(&path)?;
         return Ok(path);
@@ -64,7 +64,7 @@ pub fn locate() -> Result<PathBuf> {
             return Ok(path);
         }
     }
-    bail!("oasdiff {VERSION} is required for compatibility analysis; run contracts engine install");
+    bail!("oasdiff {VERSION} is required for compatibility analysis; run docket engine install");
 }
 
 fn asset() -> Result<(&'static str, &'static str)> {
@@ -89,7 +89,7 @@ fn asset() -> Result<(&'static str, &'static str)> {
             "windows_arm64",
             "4794300521a2ff76d14205f5141884e6f6052212484caf1d3655c149b314492c",
         ),
-        other => bail!("no pinned oasdiff release for {other:?}; provide CONTRACTS_OASDIFF"),
+        other => bail!("no pinned oasdiff release for {other:?}; provide DOCKET_OASDIFF"),
     })
 }
 

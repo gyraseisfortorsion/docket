@@ -77,10 +77,10 @@ impl Config {
         }
     }
     pub fn load(root: &Path) -> Result<Self> {
-        let path = root.join(".contracts/config.toml");
+        let path = root.join(".docket/config.toml");
         let config: Self = toml::from_str(
             &fs::read_to_string(&path)
-                .with_context(|| format!("read {}; run contracts init first", path.display()))?,
+                .with_context(|| format!("read {}; run docket init first", path.display()))?,
         )?;
         ensure!(
             config.format_version == 1,
@@ -108,7 +108,7 @@ impl Config {
     }
     pub fn save(&self, root: &Path) -> Result<()> {
         util::write_atomic(
-            &root.join(".contracts/config.toml"),
+            &root.join(".docket/config.toml"),
             toml::to_string_pretty(self)?.as_bytes(),
         )
     }
@@ -116,9 +116,9 @@ impl Config {
 
 pub fn discover(start: &Path) -> Result<PathBuf> {
     for path in start.ancestors() {
-        if path.join(".contracts/config.toml").is_file() {
+        if path.join(".docket/config.toml").is_file() {
             return Ok(path.to_owned());
         }
     }
-    anyhow::bail!("no .contracts/config.toml found; run contracts init");
+    anyhow::bail!("no .docket/config.toml found; run docket init");
 }

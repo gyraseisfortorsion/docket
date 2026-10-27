@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use contracts::{compare, config::Config, openapi, proposal, store, util};
+use docket::{compare, config::Config, openapi, proposal, store, util};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, path::Path};
 use tempfile::TempDir;
@@ -8,7 +8,7 @@ use tempfile::TempDir;
 fn invalid_schema_structure_does_not_replace_a_valid_snapshot() {
     let project = project("head");
     let root = project.path();
-    let before = fs::read(root.join(".contracts/head/manifest.json")).unwrap();
+    let before = fs::read(root.join(".docket/head/manifest.json")).unwrap();
     for schema in [
         json!({"type":"strnig"}),
         json!({"type":"object","required":"name"}),
@@ -21,13 +21,13 @@ fn invalid_schema_structure_does_not_replace_a_valid_snapshot() {
         cli(root).arg("sync").assert().failure();
         assert_eq!(
             before,
-            fs::read(root.join(".contracts/head/manifest.json")).unwrap()
+            fs::read(root.join(".docket/head/manifest.json")).unwrap()
         );
     }
 }
 
 fn cli(root: &Path) -> Command {
-    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("contracts"));
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("docket"));
     command.current_dir(root);
     command
 }
@@ -53,7 +53,7 @@ fn project(mode: &str) -> TempDir {
     directory
 }
 fn snapshot_files(root: &Path) -> BTreeMap<String, Vec<u8>> {
-    let base = root.join(".contracts");
+    let base = root.join(".docket");
     util::files(&base)
         .unwrap()
         .into_iter()
@@ -80,7 +80,7 @@ fn full_round_trip_and_noop_preserves_all_bytes_and_mtime() {
     let project = project("full");
     let root = project.path();
     let before = snapshot_files(root);
-    let mtime = fs::metadata(root.join(".contracts/head/manifest.json"))
+    let mtime = fs::metadata(root.join(".docket/head/manifest.json"))
         .unwrap()
         .modified()
         .unwrap();
@@ -97,7 +97,7 @@ fn full_round_trip_and_noop_preserves_all_bytes_and_mtime() {
     assert_eq!(before, snapshot_files(root));
     assert_eq!(
         mtime,
-        fs::metadata(root.join(".contracts/head/manifest.json"))
+        fs::metadata(root.join(".docket/head/manifest.json"))
             .unwrap()
             .modified()
             .unwrap()
@@ -113,8 +113,8 @@ fn full_round_trip_and_noop_preserves_all_bytes_and_mtime() {
 #[test]
 fn head_only_creates_no_archive() {
     let project = project("head");
-    assert!(!project.path().join(".contracts/history").exists());
-    assert!(!project.path().join(".contracts/objects").exists());
+    assert!(!project.path().join(".docket/history").exists());
+    assert!(!project.path().join(".docket/objects").exists());
     assert!(
         store::manifest(project.path())
             .unwrap()
@@ -129,7 +129,7 @@ fn history_is_portable_without_source_or_git() {
     let source = project("full");
     let target = tempfile::tempdir().unwrap();
     for (path, bytes) in snapshot_files(source.path()) {
-        util::write_atomic(&target.path().join(".contracts").join(path), &bytes).unwrap();
+        util::write_atomic(&target.path().join(".docket").join(path), &bytes).unwrap();
     }
     let revision = store::revisions(target.path()).unwrap().remove(0);
     assert_eq!(
@@ -157,17 +157,14 @@ fn immutable_revisions_have_parents_and_deduplicated_objects() {
     util::write_json(&root.join("openapi.json"), &example()).unwrap();
     cli(root).arg("sync").assert().success();
     assert_eq!(store::revisions(root).unwrap().len(), 3);
-    assert_eq!(
-        util::files(&root.join(".contracts/objects")).unwrap().len(),
-        2
-    );
+    assert_eq!(util::files(&root.join(".docket/objects")).unwrap().len(), 2);
 }
 
 #[test]
 fn modified_or_deleted_generated_views_are_not_overwritten() {
     let project = project("full");
     let root = project.path();
-    let schema = root.join(".contracts/head/users-api/schemas/UserCreate.json");
+    let schema = root.join(".docket/head/users-api/schemas/UserCreate.json");
     fs::write(&schema, "manual changes").unwrap();
     cli(root)
         .arg("sync")
@@ -280,7 +277,7 @@ fn proposal_survives_sync_and_closes_explicitly() {
         .args(["propose", "preferences"])
         .assert()
         .success();
-    let path = root.join(".contracts/proposals/preferences/users-api/openapi.json");
+    let path = root.join(".docket/proposals/preferences/users-api/openapi.json");
     let mut desired: Value = util::read_json(&path).unwrap();
     desired["info"]["description"] = json!("desired change");
     util::write_json(&path, &desired).unwrap();
@@ -405,7 +402,7 @@ fn extraction_timeout_preserves_the_previous_snapshot() {
     let before = snapshot_files(root);
     let mut config = Config::load(root).unwrap();
     config.timeout_seconds = 1;
-    config.services.get_mut("users-api").unwrap().source = contracts::config::Source::Command {
+    config.services.get_mut("users-api").unwrap().source = docket::config::Source::Command {
         command: vec!["sh".into(), "-c".into(), "sleep 15".into()],
         cwd: None,
     };
@@ -418,7 +415,7 @@ fn extraction_timeout_preserves_the_previous_snapshot() {
         .stderr(predicates::str::contains("timed out"));
     assert!(start.elapsed() < std::time::Duration::from_secs(5));
     assert_eq!(
-        fs::read(root.join(".contracts/head/manifest.json")).unwrap(),
+        fs::read(root.join(".docket/head/manifest.json")).unwrap(),
         before["head/manifest.json"]
     );
 }
@@ -427,7 +424,7 @@ fn extraction_timeout_preserves_the_previous_snapshot() {
 fn watch_debounces_input_changes_and_does_not_watch_its_own_output() {
     let project = project("full");
     let root = project.path();
-    let mut child = std::process::Command::new(assert_cmd::cargo::cargo_bin!("contracts"))
+    let mut child = std::process::Command::new(assert_cmd::cargo::cargo_bin!("docket"))
         .current_dir(root)
         .args(["watch", "--interval-ms", "50", "--debounce-ms", "50"])
         .stdout(std::process::Stdio::null())

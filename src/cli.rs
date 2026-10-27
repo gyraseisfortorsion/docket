@@ -18,7 +18,7 @@ use std::{
 
 #[derive(Parser)]
 #[command(
-    name = "contracts",
+    name = "docket",
     version,
     about = "Local, semantic version control for OpenAPI contracts"
 )]
@@ -322,7 +322,7 @@ pub fn run() -> Result<i32> {
             };
             ensure!(
                 !current.is_empty(),
-                "no saved contracts; run contracts sync or use --working"
+                "no saved contracts; run docket sync or use --working"
             );
             let label = since.unwrap_or_else(|| "head".into());
             let before = store::baseline(&root, &label)?;
@@ -366,7 +366,7 @@ pub fn run() -> Result<i32> {
                     stale
                 );
                 if stale {
-                    eprintln!("run contracts sync and commit the generated contracts");
+                    eprintln!("run docket sync and commit the generated contracts");
                 }
                 for finding in &comparison.findings {
                     println!(
@@ -432,7 +432,7 @@ pub fn run() -> Result<i32> {
         }
         Action::Propose { name } => {
             proposal::create(&root, &name)?;
-            println!("Created proposal {name}; edit with contracts edit {name}");
+            println!("Created proposal {name}; edit with docket edit {name}");
         }
         Action::Edit {
             name,
@@ -464,7 +464,7 @@ pub fn run() -> Result<i32> {
             HookCommand::Install => println!("Installed {}", git::install(&root)?.display()),
             HookCommand::Uninstall => {
                 git::uninstall(&root)?;
-                println!("Removed contracts hook");
+                println!("Removed Docket hook");
             }
         },
         _ => unreachable!(),
@@ -475,7 +475,7 @@ pub fn run() -> Result<i32> {
 fn init(root: &Path, args: Init) -> Result<()> {
     util::safe_name(&args.service)?;
     let _lock = store::lock(root)?;
-    let mut config = if root.join(".contracts/config.toml").exists() {
+    let mut config = if root.join(".docket/config.toml").exists() {
         Config::load(root)?
     } else {
         Config::new(args.history.unwrap_or(HistoryMode::Full))
@@ -538,12 +538,12 @@ fn init(root: &Path, args: Init) -> Result<()> {
             "head/** -text -filter\nhistory/** -text -filter\nobjects/** -text -filter\n",
         ),
     ] {
-        let path = root.join(".contracts").join(file);
+        let path = root.join(".docket").join(file);
         if !path.exists() {
             util::write_atomic(&path, bytes.as_bytes())?;
         }
     }
-    println!("Registered {}; run contracts sync", args.service);
+    println!("Registered {}; run docket sync", args.service);
     Ok(())
 }
 
@@ -599,14 +599,14 @@ fn watch(root: &Path, interval_ms: u64, debounce_ms: u64) -> Result<i32> {
         }
         let matcher = builder.build()?;
         let mut parts = Vec::new();
-        parts.push(fs::read(root.join(".contracts/config.toml"))?);
+        parts.push(fs::read(root.join(".docket/config.toml"))?);
         for entry in walkdir::WalkDir::new(root)
             .follow_links(false)
             .into_iter()
             .filter_entry(|e| {
                 ![
                     ".git",
-                    ".contracts",
+                    ".docket",
                     ".venv",
                     "venv",
                     "node_modules",
@@ -638,14 +638,14 @@ fn watch(root: &Path, interval_ms: u64, debounce_ms: u64) -> Result<i32> {
                 let (documents, _) = extract::extract(root, &config, None)?;
                 let result = store::sync(root, &config, &documents)?;
                 eprintln!(
-                    "contracts: {} {}",
+                    "docket: {} {}",
                     if result.changed { "saved" } else { "unchanged" },
                     &result.snapshot[..12]
                 );
                 Ok(())
             })();
             if let Err(error) = result {
-                eprintln!("contracts: {error:#}");
+                eprintln!("docket: {error:#}");
             }
             pending = None;
         }
