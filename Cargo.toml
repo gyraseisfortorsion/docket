@@ -6,7 +6,8 @@ rust-version = "1.85"
 description = "Local, semantic version control for OpenAPI contracts"
 license = "MIT"
 readme = "README.md"
-include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/*.json", "/examples/fastapi/*.py", "/README.md", "/LICENSE", "/scripts/**", "/requirements-dev.txt"]
+repository = "https://github.com/gyraseisfortorsion/docket"
+include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/*.json", "/examples/fastapi/*.py", "/README.md", "/LICENSE", "/scripts/**", "/requirements-dev.txt", "/packaging/**", "/docs/**"]
 
 [dependencies]
 anyhow = "1"

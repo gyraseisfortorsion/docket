@@ -1,0 +1,4 @@
+# Package versions come from Cargo.toml; the engine pin comes from src/engine.rs.
+repository = "gyraseisfortorsion/docket"
+python_distribution = "docket"
+npm_scope = "@gyraseisfortorsion"

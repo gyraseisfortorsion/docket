@@ -16,10 +16,28 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: python -m pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -r requirements-dev.txt uv==0.7.8
+      - run: python -m unittest discover -s tests -p 'test_distribution.py' -v
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo run --locked -- engine install
       - name: All tests, including real engine and FastAPI
         run: DOCKET_TEST_PYTHON="$(command -v python)" cargo test --locked --all-targets -- --include-ignored
       - run: cargo build --locked --release
+      - name: Smoke-test uv and npm packages
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            target=aarch64-apple-darwin
+          else
+            # CI's GNU host binary isn't distributable as a static Linux wheel.
+            # The release matrix builds and tests both musl Linux targets.
+            exit 0
+          fi
+          engine="$(target/release/docket engine path)"
+          python scripts/distribute.py build --target "$target" --binary target/release/docket --engine "$engine"
+          python scripts/distribute.py assemble --allow-partial --npm-local
+          python scripts/smoke_packages.py --target "$target"

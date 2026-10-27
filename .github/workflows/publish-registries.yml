@@ -1,0 +1,81 @@
+name: publish package registries
+# Optional: GitHub release installers work without publishing to any registry.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing GitHub release tag (for example v0.1.0)'
+        required: true
+        type: string
+      pypi:
+        description: Publish platform wheels to PyPI (requires trusted publisher setup)
+        type: boolean
+        default: false
+      npm:
+        description: Publish npm platform packages and launcher (requires NPM_TOKEN)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: registry-publish-${{ inputs.tag }}
+  cancel-in-progress: false
+jobs:
+  pypi:
+    if: inputs.pypi
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified release wheels
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          mkdir dist
+          gh release download "$RELEASE_TAG" --dir dist --pattern 'docket-*.whl' --pattern SHA256SUMS
+          cd dist
+          sha256sum --check --ignore-missing SHA256SUMS
+          rm SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+  npm:
+    if: inputs.npm
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - name: Download verified release npm packages
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          mkdir dist
+          gh release download "$RELEASE_TAG" --dir dist --pattern 'docket-npm-*.tgz' --pattern SHA256SUMS
+          cd dist
+          sha256sum --check --ignore-missing SHA256SUMS
+      - name: Publish native packages, then the launcher
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          test -n "$NODE_AUTH_TOKEN" || { echo 'Configure the NPM_TOKEN environment secret first.' >&2; exit 1; }
+          for package in dist/docket-npm-darwin-*.tgz dist/docket-npm-linux-*.tgz; do
+            npm publish "$package" --access public --provenance
+          done
+          npm publish "dist/docket-npm-registry-${RELEASE_TAG#v}.tgz" --access public --provenance

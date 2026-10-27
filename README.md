@@ -10,17 +10,56 @@ analysis. Everything operates locally; comparisons do not upload contracts.
 
 ## Install and try it
 
-Build with Rust 1.85 or newer and a C compiler for the compression dependency:
+Prebuilt packages include **Docket and oasdiff**; installing them requires no
+Rust compiler. Packages target macOS 13+ and Linux, on Intel/x86_64 and ARM64.
+The commands below become available when the matching GitHub release is published
+and its Homebrew formula is added. This checkout includes the complete release
+pipeline; it does not itself publish packages.
+
+**Homebrew** (macOS or Linux):
+
+```sh
+brew tap gyraseisfortorsion/docket https://github.com/gyraseisfortorsion/docket.git
+brew install gyraseisfortorsion/docket/docket
+```
+
+**uv**, using a release wheel that selects your platform:
+
+```sh
+uv tool install https://github.com/gyraseisfortorsion/docket/releases/download/v0.1.0/docket_release-0.1.0-py3-none-any.whl
+```
+
+**npm** (Node 18+), using the release's binary packages:
+
+```sh
+npm install --global https://github.com/gyraseisfortorsion/docket/releases/download/v0.1.0/docket-npm-0.1.0.tgz
+```
+
+**apt-get** (Debian/Ubuntu): download the `.deb` matching your CPU, then install it:
+
+```sh
+arch="$(dpkg --print-architecture)"  # amd64 or arm64
+curl --fail --location --output "docket_0.1.0_${arch}.deb" \
+  "https://github.com/gyraseisfortorsion/docket/releases/download/v0.1.0/docket_0.1.0_${arch}.deb"
+sudo apt-get install "./docket_0.1.0_${arch}.deb"
+```
+
+Release assets include `SHA256SUMS` for download verification. This apt route
+installs a local package; it does not add an apt repository for automatic updates.
+An optional registry publishing workflow also enables `uv tool install docket`
+and `npm install --global @gyraseisfortorsion/docket` after PyPI/npm account setup.
+See [release and local packaging instructions](docs/releasing.md).
+
+To build from source instead, use Rust 1.85+ and a C compiler:
 
 ```sh
 cargo install --path . --locked
 docket engine install
 ```
 
-The engine installer requires `curl`, verifies a pinned SHA-256 checksum, and
-installs into `$XDG_CACHE_HOME/docket` or `~/.cache/docket`. It supports
-macOS universal, Linux x86_64/arm64, and Windows x86_64/arm64 engine releases.
-The automated integration suite runs on macOS and Linux.
+Source installs use `curl` to fetch the engine, verify its pinned SHA-256, and
+cache it in `$XDG_CACHE_HOME/docket` or `~/.cache/docket`. Binary packages already
+include the engine and need no separate engine installation.
 
 In an API repository:
 

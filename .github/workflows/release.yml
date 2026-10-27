@@ -1,0 +1,173 @@
+name: binary release
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    # Manual runs must select an existing version tag, never a moving branch.
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            npm: darwin-arm64
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            npm: darwin-x64
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            npm: linux-x64
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            npm: linux-arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      CC_x86_64_unknown_linux_musl: musl-gcc
+      CC_aarch64_unknown_linux_musl: musl-gcc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Verify release version
+        id: version
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, tomllib
+          version = tomllib.load(open('Cargo.toml', 'rb'))['package']['version']
+          assert os.environ['GITHUB_REF_NAME'] == f'v{version}', 'tag must match Cargo.toml'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\n')
+          PY
+      - name: Linux static toolchain
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - run: python -m pip install uv==0.7.8
+      - run: python -m unittest discover -s tests -p 'test_distribution.py' -v
+      - run: cargo test --locked --target ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package native binaries
+        shell: bash
+        run: |
+          binary="target/${{ matrix.target }}/release/docket"
+          engine="$($binary engine install)"
+          python scripts/distribute.py build --target '${{ matrix.target }}' --binary "$binary" --engine "$engine"
+          python scripts/distribute.py assemble --allow-partial --npm-local
+      - name: Install through uv and npm without Rust
+        run: python scripts/smoke_packages.py --target ${{ matrix.target }}
+      - name: Install through Homebrew
+        if: runner.os == 'macOS'
+        run: bash scripts/smoke_brew.sh dist/local-Formula/docket.rb
+      - name: Install through apt-get
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get install -y ./dist/docket_${{ steps.version.outputs.version }}_$(dpkg --print-architecture).deb
+          test "$(docket --version)" = 'docket ${{ steps.version.outputs.version }}'
+          test "$(docket engine path)" = /usr/lib/docket/oasdiff
+          tmp="$(mktemp -d)"
+          cp examples/users.openapi.json "$tmp/openapi.json"
+          docket --root "$tmp" init --service users --file openapi.json
+          docket --root "$tmp" sync
+          docket --root "$tmp" report --format json > "$tmp/report.json"
+          python -m json.tool "$tmp/report.json" >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            dist/docket-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz
+            dist/*.whl
+            dist/docket-npm-${{ matrix.npm }}-${{ steps.version.outputs.version }}.tgz
+            dist/*.deb
+            dist/manifest-*.json
+
+  release:
+    needs: package
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: dist
+      - run: python scripts/distribute.py assemble
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify complete multi-platform installers and wheel metadata
+        shell: bash
+        run: |
+          python -m pip install 'twine>=6,<7' uv==0.7.8
+          python -m twine check --strict dist/*.whl
+          python scripts/distribute.py assemble --output "$RUNNER_TEMP/installer-smoke" --npm-local
+          python scripts/smoke_packages.py --directory "$RUNNER_TEMP/installer-smoke" --target x86_64-unknown-linux-musl
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if draft="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$draft" != true ]; then
+              echo 'Release already published; use a new version instead of replacing immutable assets.' >&2
+              exit 1
+            fi
+          else
+            gh release create "$tag" --verify-tag --draft --title "Docket $tag" --generate-notes
+          fi
+          gh release upload "$tag" dist/*.tar.gz dist/*.tgz dist/*.whl dist/*.deb dist/SHA256SUMS dist/docket.rb --clobber
+          gh release edit "$tag" --draft=false
+      - name: Update Homebrew tap in this repository
+        # An old-tag rerun must never replace a newer formula.
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cp dist/docket.rb "$RUNNER_TEMP/docket.rb"
+          git checkout main
+          git pull --ff-only origin main
+          latest="$(git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1)"
+          if [ "$latest" != "$RELEASE_TAG" ]; then
+            echo "Skipping formula update for an older release."
+            exit 0
+          fi
+          git merge-base --is-ancestor "$RELEASE_TAG" HEAD
+          mkdir -p Formula
+          cp "$RUNNER_TEMP/docket.rb" Formula/docket.rb
+          git add Formula/docket.rb
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Update Homebrew formula for $RELEASE_TAG"
+            git push origin HEAD:main
+          fi
