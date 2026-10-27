@@ -1,0 +1,38 @@
+[package]
+name = "contracts"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Local, semantic version control for OpenAPI contracts"
+license = "MIT"
+readme = "README.md"
+include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/examples/*.json", "/examples/fastapi/*.py", "/README.md", "/LICENSE", "/scripts/**", "/requirements-dev.txt"]
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4", features = ["derive"] }
+flate2 = "1"
+fs2 = "0.4"
+globset = "0.4"
+libc = "0.2"
+percent-encoding = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+shell-words = "1"
+tar = "0.4"
+tempfile = "3"
+toml = "0.8"
+wait-timeout = "0.2"
+walkdir = "2"
+zstd = "0.13"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+
+[profile.release]
+lto = "thin"
+strip = true
+
